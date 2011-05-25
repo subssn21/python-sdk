@@ -206,7 +206,7 @@ class GraphAPI(object):
                 continue
             L.append('--' + BOUNDARY)
             if hasattr(value, 'read') and callable(value.read): 
-                filename = getattr(value,'name','%s.jpg' % key)
+                filename = str(getattr(value,'name','%s.jpg' % key))
                 L.append('Content-Disposition: form-data; name="%s"; filename="%s"' % (key, filename))
                 L.append('Content-Type: image/jpeg')
                 value = value.read()
