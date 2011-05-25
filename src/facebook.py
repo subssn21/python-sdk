@@ -156,23 +156,37 @@ class GraphAPI(object):
         """Deletes the object with the given ID from the graph."""
         self.request(id, post_args={"method": "delete"})
 
+
     def put_photo(self, image, message=None, album_id=None, **kwargs):
-        """Uploads an image using multipart/form-data
-        image=File like object for the image
-        message=Caption for your image
-        album_id=None posts to /me/photos which uses or creates and uses 
+        """
+        Shortcut for put_media to upload a photo
+        """
+        self.put_media(image, message, album_id, fxtype='photos', kwargs=kwargs)
+
+    def put_video(self, image, message=None, album_id=None, **kwargs):
+        """
+        Shortcut for put_media to upload a video
+        """
+        self.put_media(image, message, album_id, fxtype='videos', kwargs=kwargs)
+
+    def put_media(self, fx, message=None, album_id=None, fxtype=None, **kwargs):
+        """Uploads a file using multipart/form-data
+        fx: File like object for the image
+        message: Caption for your image
+        album_id: On photos, None posts to /me/photos which uses or creates and uses 
         an album for your application.
+        fxtype: one of 'photos' or 'videos' depending on media type
         """
         object_id = album_id or "me"
         #it would have been nice to reuse self.request; but multipart is messy in urllib
         post_args = {
 				  'access_token': self.access_token,
-				  'source': image,
+				  'source': fx,
 				  'message': message
         }
         post_args.update(kwargs)
-        content_type, body = self._encode_multipart_form(post_args)
-        req = urllib2.Request("https://graph.facebook.com/%s/photos" % object_id, data=body)
+        content_type, body = self._encode_multipart_form(post_args, fxtype)
+        req = urllib2.Request("https://graph.facebook.com/%s/%s" % (object_id, fxtype), data=body)
         req.add_header('Content-Type', content_type)
         try:
             data = urllib2.urlopen(req).read()
@@ -191,7 +205,7 @@ class GraphAPI(object):
         return response
 
     # based on: http://code.activestate.com/recipes/146306/
-    def _encode_multipart_form(self, fields):
+    def _encode_multipart_form(self, fields, fxtype):
         """Fields are a dict of form name-> value
         For files, value should be a file object.
         Other file-like objects might work and a fake name will be chosen.
@@ -206,9 +220,12 @@ class GraphAPI(object):
                 continue
             L.append('--' + BOUNDARY)
             if hasattr(value, 'read') and callable(value.read): 
-                filename = getattr(value,'name','%s.jpg' % key)
+                filename = str(getattr(value,'name','%s.jpg' % key))
                 L.append('Content-Disposition: form-data; name="%s"; filename="%s"' % (key, filename))
-                L.append('Content-Type: image/jpeg')
+                if fxtype == "videos":
+                    L.append('Content-Type: video/*')    
+                else:
+                    L.append('Content-Type: image/*')
                 value = value.read()
                 logging.debug(type(value))
             else:
